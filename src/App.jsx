@@ -33,19 +33,30 @@ export default function App() {
   const [settings, setSettings] = useState(() => {
     try {
       const saved = localStorage.getItem("aimsett-settings");
-      return saved
-        ? { ...DEFAULT_SETTINGS, ...JSON.parse(saved) }
-        : DEFAULT_SETTINGS;
+      if (!saved) return DEFAULT_SETTINGS;
+      const parsed = JSON.parse(saved);
+      // Deep-merge `crosshair` specifically: a plain spread would drop any
+      // new crosshair field added after a user's settings were already
+      // persisted (the saved blob only has the older fields).
+      return {
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+        crosshair: { ...DEFAULT_SETTINGS.crosshair, ...parsed.crosshair },
+      };
     } catch {
       return DEFAULT_SETTINGS;
     }
   });
   const [showSettings, setShowSettings] = useState(false);
-  const [infoMode, setInfoMode] = useState(null);
+  const [showCrosshair, setShowCrosshair] = useState(false);
+  // Mode description is shown by default (simplified, always-on help text);
+  // clicking the "i" button hides it for users who already know the mode.
+  const [infoMode, setInfoMode] = useState(true);
   const areaRef = useRef(null);
   const ringRef = useRef(null);
   const stageRef = useRef(null);
   const [previewRect, setPreviewRect] = useState(null);
+  const [menuCursor, setMenuCursor] = useState({ x: 0, y: 0 });
 
   const modeConf = MODES[mode];
 
@@ -115,6 +126,21 @@ export default function App() {
     return () => ro.disconnect();
   }, [settings.playArea]);
 
+  // let the user preview their crosshair settings on the menu screen too
+  // (before clicking Start) — same OS-cursor tracking approach used during
+  // gameplay, just scoped to the menu instead of the arena.
+  useEffect(() => {
+    if (status === "running") return;
+    const el = stageRef.current;
+    if (!el) return;
+    const onMove = (e) => {
+      const rect = el.getBoundingClientRect();
+      setMenuCursor({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    };
+    el.addEventListener("mousemove", onMove);
+    return () => el.removeEventListener("mousemove", onMove);
+  }, [status]);
+
   const accuracy = useMemo(() => {
     if (stats.totalShots === 0) return 0;
     return Math.round((stats.hits / stats.totalShots) * 100);
@@ -151,8 +177,62 @@ export default function App() {
   const isTrackingMode = mode === "tracking";
   const modeLabel = t(`modeLabel_${mode}`);
 
+  // Renders the custom crosshair markup at a given {x, y} — shared by the
+  // menu preview and the in-game arena so both stay pixel-identical.
+  function renderCrosshair(pos) {
+    const { color, size, thickness, gap, dot, dotSize } = settings.crosshair;
+    const arm = Math.max((size - gap) / 2, 0);
+    const half = gap / 2;
+    return (
+      <div className="crosshair" style={{ left: pos.x, top: pos.y }}>
+        <span
+          className="ch-line ch-top"
+          style={{
+            width: thickness,
+            height: arm,
+            bottom: half,
+            background: color,
+          }}
+        />
+        <span
+          className="ch-line ch-bottom"
+          style={{
+            width: thickness,
+            height: arm,
+            top: half,
+            background: color,
+          }}
+        />
+        <span
+          className="ch-line ch-left"
+          style={{
+            height: thickness,
+            width: arm,
+            right: half,
+            background: color,
+          }}
+        />
+        <span
+          className="ch-line ch-right"
+          style={{
+            height: thickness,
+            width: arm,
+            left: half,
+            background: color,
+          }}
+        />
+        {dot && (
+          <span
+            className="ch-dot"
+            style={{ width: dotSize, height: dotSize, background: color }}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="app">
+    <div className={`app ${!settings.crosshair.enabled ? "cursor-only" : ""}`}>
       <header className="topbar">
         <div className="brand">
           Aim<span className="title-accent">SETT</span>
@@ -200,128 +280,315 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <button
-              className="settings-toggle"
-              onClick={() => setShowSettings((v) => !v)}
-              aria-label={t("settings")}
-            >
-              ⚙
-            </button>
           </div>
         )}
       </header>
 
       {status !== "running" && showSettings && (
-        <div className="settings-panel">
-          <h3>{t("settings")}</h3>
-          <label>
-            {t("targetSize")}
-            <input
-              type="range"
-              min="18"
-              max="60"
-              value={settings.targetSize}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  targetSize: Number(e.target.value),
-                }))
-              }
-            />
-            <span>{settings.targetSize}px</span>
-          </label>
-          <label>
-            {t("targetSpeedTracking")}
-            <input
-              type="range"
-              min="0.5"
-              max="6"
-              step="0.1"
-              value={settings.targetSpeed}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  targetSpeed: Number(e.target.value),
-                }))
-              }
-            />
-            <span>{settings.targetSpeed.toFixed(1)}</span>
-          </label>
-          <label>
-            {t("centerDwellFlicking")}
-            <input
-              type="range"
-              min="500"
-              max="3000"
-              step="100"
-              value={settings.centerDwellTime}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  centerDwellTime: Number(e.target.value),
-                }))
-              }
-            />
-            <span>{(settings.centerDwellTime / 1000).toFixed(1)}s</span>
-          </label>
-          <label>
-            {t("hoverDwellTracking")}
-            <input
-              type="range"
-              min="500"
-              max="5000"
-              step="100"
-              value={settings.hoverDwellTime}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  hoverDwellTime: Number(e.target.value),
-                }))
-              }
-            />
-            <span>{(settings.hoverDwellTime / 1000).toFixed(1)}s</span>
-          </label>
-          <label>
-            {t("volume")}
-            <input
-              type="range"
-              min="0"
-              max="100"
-              step="5"
-              value={Math.round(settings.volume * 100)}
-              onChange={(e) =>
-                setSettings((s) => ({
-                  ...s,
-                  volume: Number(e.target.value) / 100,
-                }))
-              }
-            />
-            <span>{Math.round(settings.volume * 100)}%</span>
-          </label>
-          <label>
-            {t("playArea")}
-            <div className="pill-row">
-              {["full", "16:9", "4:3"].map((pa) => (
-                <button
-                  key={pa}
-                  className={`pill ${settings.playArea === pa ? "active" : ""}`}
-                  onClick={() => setSettings((s) => ({ ...s, playArea: pa }))}
-                >
-                  {pa === "full" ? t("fullscreen") : pa}
-                </button>
-              ))}
-            </div>
-          </label>
-          <button
-            className="link-btn"
-            onClick={() => setSettings(DEFAULT_SETTINGS)}
-          >
-            {t("restoreDefaults")}
-          </button>
+        <div
+          className="crosshair-modal-backdrop"
+          onClick={() => setShowSettings(false)}
+        >
+          <div className="settings-panel" onClick={(e) => e.stopPropagation()}>
+            <h3>{t("settings")}</h3>
+            <label>
+              {t("targetSize")}
+              <input
+                type="range"
+                min="18"
+                max="60"
+                value={settings.targetSize}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    targetSize: Number(e.target.value),
+                  }))
+                }
+              />
+              <span>{settings.targetSize}px</span>
+            </label>
+            <label>
+              {t("targetSpeedTracking")}
+              <input
+                type="range"
+                min="0.5"
+                max="6"
+                step="0.1"
+                value={settings.targetSpeed}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    targetSpeed: Number(e.target.value),
+                  }))
+                }
+              />
+              <span>{settings.targetSpeed.toFixed(1)}</span>
+            </label>
+            <label>
+              {t("centerDwellFlicking")}
+              <input
+                type="range"
+                min="500"
+                max="3000"
+                step="100"
+                value={settings.centerDwellTime}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    centerDwellTime: Number(e.target.value),
+                  }))
+                }
+              />
+              <span>{(settings.centerDwellTime / 1000).toFixed(1)}s</span>
+            </label>
+            <label>
+              {t("hoverDwellTracking")}
+              <input
+                type="range"
+                min="500"
+                max="5000"
+                step="100"
+                value={settings.hoverDwellTime}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    hoverDwellTime: Number(e.target.value),
+                  }))
+                }
+              />
+              <span>{(settings.hoverDwellTime / 1000).toFixed(1)}s</span>
+            </label>
+            <label>
+              {t("volume")}
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={Math.round(settings.volume * 100)}
+                onChange={(e) =>
+                  setSettings((s) => ({
+                    ...s,
+                    volume: Number(e.target.value) / 100,
+                  }))
+                }
+              />
+              <span>{Math.round(settings.volume * 100)}%</span>
+            </label>
+            <label>
+              {t("playArea")}
+              <div className="pill-row">
+                {["full", "16:9", "4:3"].map((pa) => (
+                  <button
+                    key={pa}
+                    className={`pill ${settings.playArea === pa ? "active" : ""}`}
+                    onClick={() => setSettings((s) => ({ ...s, playArea: pa }))}
+                  >
+                    {pa === "full" ? t("fullscreen") : pa}
+                  </button>
+                ))}
+              </div>
+            </label>
+            <button
+              className="link-btn"
+              onClick={() => setSettings(DEFAULT_SETTINGS)}
+            >
+              {t("restoreDefaults")}
+            </button>
+          </div>
         </div>
       )}
 
-      <div className="stage" ref={stageRef}>
+      {status !== "running" && showCrosshair && (
+        <div
+          className="crosshair-modal-backdrop"
+          onClick={() => setShowCrosshair(false)}
+        >
+          <div
+            className="settings-panel crosshair-panel"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3>{t("crosshairSettings")}</h3>
+            <div className="crosshair-preview-box">
+              {settings.crosshair.enabled ? (
+                renderCrosshair({ x: "50%", y: "50%" })
+              ) : (
+                <span className="crosshair-preview-cursor-hint">
+                  {t("cursorOnly")}
+                </span>
+              )}
+            </div>
+            <label>
+              {t("crosshairMode")}
+              <div className="pill-row">
+                <button
+                  className={`pill ${settings.crosshair.enabled ? "active" : ""}`}
+                  onClick={() =>
+                    setSettings((s) => ({
+                      ...s,
+                      crosshair: { ...s.crosshair, enabled: true },
+                    }))
+                  }
+                >
+                  {t("crosshairOn")}
+                </button>
+                <button
+                  className={`pill ${!settings.crosshair.enabled ? "active" : ""}`}
+                  onClick={() =>
+                    setSettings((s) => ({
+                      ...s,
+                      crosshair: { ...s.crosshair, enabled: false },
+                    }))
+                  }
+                >
+                  {t("cursorOnly")}
+                </button>
+              </div>
+            </label>
+            {settings.crosshair.enabled && (
+              <>
+                <label>
+                  {t("crosshairColor")}
+                  <input
+                    type="color"
+                    value={settings.crosshair.color}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        crosshair: { ...s.crosshair, color: e.target.value },
+                      }))
+                    }
+                  />
+                </label>
+                <label>
+                  {t("crosshairSize")}
+                  <input
+                    type="range"
+                    min="8"
+                    max="60"
+                    value={settings.crosshair.size}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        crosshair: {
+                          ...s.crosshair,
+                          size: Number(e.target.value),
+                        },
+                      }))
+                    }
+                  />
+                  <span>{settings.crosshair.size}px</span>
+                </label>
+                <label>
+                  {t("crosshairThickness")}
+                  <input
+                    type="range"
+                    min="1"
+                    max="8"
+                    value={settings.crosshair.thickness}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        crosshair: {
+                          ...s.crosshair,
+                          thickness: Number(e.target.value),
+                        },
+                      }))
+                    }
+                  />
+                  <span>{settings.crosshair.thickness}px</span>
+                </label>
+                <label>
+                  {t("crosshairGap")}
+                  <input
+                    type="range"
+                    min="0"
+                    max="24"
+                    value={settings.crosshair.gap}
+                    onChange={(e) =>
+                      setSettings((s) => ({
+                        ...s,
+                        crosshair: {
+                          ...s.crosshair,
+                          gap: Number(e.target.value),
+                        },
+                      }))
+                    }
+                  />
+                  <span>{settings.crosshair.gap}px</span>
+                </label>
+                <label>
+                  {t("crosshairDot")}
+                  <div className="pill-row">
+                    <button
+                      className={`pill ${settings.crosshair.dot ? "active" : ""}`}
+                      onClick={() =>
+                        setSettings((s) => ({
+                          ...s,
+                          crosshair: { ...s.crosshair, dot: true },
+                        }))
+                      }
+                    >
+                      {t("on")}
+                    </button>
+                    <button
+                      className={`pill ${!settings.crosshair.dot ? "active" : ""}`}
+                      onClick={() =>
+                        setSettings((s) => ({
+                          ...s,
+                          crosshair: { ...s.crosshair, dot: false },
+                        }))
+                      }
+                    >
+                      {t("off")}
+                    </button>
+                  </div>
+                </label>
+                {settings.crosshair.dot && (
+                  <label>
+                    {t("crosshairDotSize")}
+                    <input
+                      type="range"
+                      min="2"
+                      max="10"
+                      value={settings.crosshair.dotSize}
+                      onChange={(e) =>
+                        setSettings((s) => ({
+                          ...s,
+                          crosshair: {
+                            ...s.crosshair,
+                            dotSize: Number(e.target.value),
+                          },
+                        }))
+                      }
+                    />
+                    <span>{settings.crosshair.dotSize}px</span>
+                  </label>
+                )}
+              </>
+            )}
+            <button
+              className="link-btn"
+              onClick={() =>
+                setSettings((s) => ({
+                  ...s,
+                  crosshair: DEFAULT_SETTINGS.crosshair,
+                }))
+              }
+            >
+              {t("restoreDefaults")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div
+        className={`stage ${status !== "running" && !settings.crosshair.enabled ? "no-crosshair" : ""}`}
+        ref={stageRef}
+      >
+        {status !== "running" &&
+          settings.crosshair.enabled &&
+          renderCrosshair(menuCursor)}
         {previewRect && settings.playArea !== "full" && (
           <div
             className="play-area-bounds"
@@ -454,16 +721,49 @@ export default function App() {
                   </div>
                 </div>
 
-                <button className="start-btn" onClick={start}>
-                  {t("start")}
-                </button>
+                <div className="start-row">
+                  <div className="icon-toggle-row">
+                    <button
+                      className="crosshair-icon-btn"
+                      onClick={() => {
+                        setShowCrosshair((v) => !v);
+                        setShowSettings(false);
+                      }}
+                      aria-label={t("crosshairSettings")}
+                    >
+                      <span className="crosshair-icon-glyph">⊕</span>
+                      <span className="crosshair-icon-label">
+                        {t("crosshairSettings")}
+                      </span>
+                    </button>
+                    <button
+                      className="crosshair-icon-btn"
+                      onClick={() => {
+                        setShowSettings((v) => !v);
+                        setShowCrosshair(false);
+                      }}
+                      aria-label={t("settings")}
+                    >
+                      <span className="crosshair-icon-glyph">⚙</span>
+                      <span className="crosshair-icon-label">
+                        {t("settings")}
+                      </span>
+                    </button>
+                  </div>
+                  <button className="start-btn" onClick={start}>
+                    {t("start")}
+                  </button>
+                </div>
               </>
             )}
           </div>
         )}
 
         {status === "running" && (
-          <div className="arena" ref={areaRef}>
+          <div
+            className={`arena ${!settings.crosshair.enabled ? "no-crosshair" : ""}`}
+            ref={areaRef}
+          >
             {centerGate && phase === "centering" && (
               <div
                 className="center-gate"
@@ -487,10 +787,7 @@ export default function App() {
                 <span className="center-gate-hint">{t("centerGateHint")}</span>
               </div>
             )}
-            <div
-              className="crosshair"
-              style={{ left: crosshair.x, top: crosshair.y }}
-            />
+            {settings.crosshair.enabled && renderCrosshair(crosshair)}
             {targets.map((t) => (
               <Target
                 key={t.id}

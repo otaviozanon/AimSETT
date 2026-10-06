@@ -47,6 +47,15 @@ export const DEFAULT_SETTINGS = {
   hoverDwellTime: 3000,
   playArea: "full",
   volume: 0.7,
+  crosshair: {
+    enabled: true,
+    color: "#5eead4",
+    size: 20,
+    thickness: 2,
+    gap: 6,
+    dot: false,
+    dotSize: 3,
+  },
 };
 
 // Formats a millisecond duration for display: values under 1s stay in

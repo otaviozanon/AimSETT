@@ -31,6 +31,11 @@
     -apple-system,
     "Segoe UI",
     sans-serif;
+  /* Prevents the browser from ever showing a text-selection (I-beam)
+     cursor over HUD labels/hints while a custom crosshair/cursor is
+     active during gameplay. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .stage {
@@ -39,13 +44,37 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  /* Lets the crosshair preview show on the menu too, before a run starts.
+     Interactive elements (buttons, inputs) set their own `cursor` and
+     override this. */
+  cursor: none;
+}
+
+/* "Cursor only" mode (crosshair disabled in settings): show the real OS
+   pointer on the menu screen instead of hiding it. */
+.stage.no-crosshair {
+  cursor: default;
+}
+
+/* While the custom crosshair is active, nothing in the main menu card
+   should reveal the OS pointer (buttons normally set their own
+   `cursor: pointer`, which would otherwise show through on hover) — only
+   the crosshair itself may be visible there. This does NOT apply to the
+   settings / crosshair modals: those are popups for fiddling with sliders
+   and a color picker, where the real OS pointer must always stay visible
+   and precise, no matter which crosshair mode is selected — otherwise you
+   can't tell where you're clicking/dragging. */
+.app:not(.cursor-only) .panel * {
+  cursor: none !important;
 }
 
 .topbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 28px;
+  gap: 8px 16px;
+  padding: 14px clamp(14px, 4vw, 28px);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   z-index: 5;
@@ -68,7 +97,9 @@
 
 .hud {
   display: flex;
-  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 24px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -112,7 +143,7 @@
 
 .title {
   font-family: "Rajdhani", "Inter", sans-serif;
-  font-size: 3.4rem;
+  font-size: clamp(2.2rem, 8vw, 3.4rem);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -124,8 +155,9 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 24px 44px;
-  min-width: 560px;
+  padding: 24px clamp(16px, 6vw, 44px);
+  width: min(560px, 92vw);
+  box-sizing: border-box;
 }
 
 .results h2 {
@@ -203,6 +235,7 @@
 
 .pill-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 8px;
 }
@@ -229,6 +262,42 @@
   border-color: var(--text);
   color: #0b0b0c;
   font-weight: 600;
+}
+
+.start-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon-toggle-row {
+  display: flex;
+  gap: 10px;
+}
+
+.crosshair-icon-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.crosshair-icon-btn:hover {
+  border-color: var(--text-faint);
+  color: var(--text);
+}
+
+.crosshair-icon-glyph {
+  font-size: 1rem;
 }
 
 .start-btn {
@@ -300,27 +369,39 @@
   background: rgba(255, 90, 60, 0.12);
 }
 
-.settings-toggle {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-muted);
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
+/* Both the settings and crosshair panels open as centered modals. */
+.crosshair-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  cursor: default;
+  /* Fallback for very short/narrow viewports: if the panel's own max-height
+     or width still doesn't fit, let the backdrop scroll instead of clipping
+     it off-screen with no way to reach the rest. */
+  overflow: auto;
+  padding: 24px 16px;
 }
 
-.settings-toggle:hover {
-  border-color: var(--text-faint);
-  color: var(--text);
+.settings-panel,
+.settings-panel * {
+  /* Always the real OS pointer inside settings/crosshair modals, regardless
+     of the crosshair mode selected for the game — sliders, the color
+     picker and buttons here need a precise, visible cursor. */
+  cursor: default !important;
+}
+
+.settings-panel input[type="range"],
+.settings-panel input[type="color"],
+.settings-panel button {
+  cursor: pointer !important;
 }
 
 .settings-panel {
-  position: absolute;
-  top: 64px;
-  right: 28px;
+  position: static;
   z-index: 10;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -328,9 +409,42 @@
   padding: 18px 22px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  width: 280px;
+  gap: 12px;
+  width: min(280px, 90vw);
+  max-height: 92vh;
+  overflow-y: auto;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+}
+
+/* Crosshair config: minimalist square-ish shape with room for all fields
+   plus the live preview box, no forced aspect-ratio (that's what was
+   squeezing it down and triggering the scrollbar). The preview box is kept
+   compact so toggling optional fields (e.g. the center dot slider) doesn't
+   push the panel's total height over the scroll threshold. */
+.settings-panel.crosshair-panel {
+  width: min(300px, 90vw);
+}
+
+.crosshair-preview-box {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  flex-shrink: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+.crosshair-preview-cursor-hint {
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .settings-panel h3 {
@@ -393,14 +507,51 @@
   cursor: none;
 }
 
+/* "Cursor only" mode (custom crosshair disabled in settings): show the
+   real OS pointer instead of hiding it. */
+.arena.no-crosshair {
+  cursor: default;
+}
+
+/* Targets force `cursor: none` so the custom crosshair is never occluded
+   by the OS pointer; in "cursor only" mode (crosshair disabled) that same
+   rule would still hide the real pointer over targets, so it must yield
+   back to the default OS cursor there. */
+.arena.no-crosshair .target {
+  cursor: default;
+}
+
 .crosshair {
   position: absolute;
-  width: 20px;
-  height: 20px;
-  transform: translate(-50%, -50%);
+  width: 0;
+  height: 0;
   pointer-events: none;
   opacity: 0.9;
   z-index: 4;
+}
+
+.ch-line {
+  position: absolute;
+}
+
+.ch-top,
+.ch-bottom {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ch-left,
+.ch-right {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ch-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .center-gate {
@@ -470,29 +621,6 @@
   transform: rotate(0deg);
 }
 
-.crosshair::before,
-.crosshair::after {
-  content: "";
-  position: absolute;
-  background: var(--crosshair);
-}
-
-.crosshair::before {
-  left: 50%;
-  top: 0;
-  width: 2px;
-  height: 100%;
-  transform: translateX(-50%);
-}
-
-.crosshair::after {
-  top: 50%;
-  left: 0;
-  height: 2px;
-  width: 100%;
-  transform: translateY(-50%);
-}
-
 .mode-tag {
   position: absolute;
   bottom: 14px;
@@ -509,6 +637,7 @@
   background: transparent;
   cursor: none;
   padding: 0;
+  /* overridden below for "cursor only" mode */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -579,6 +708,46 @@
 
 .analytics-chart {
   margin-bottom: 8px;
+  min-width: 0;
+}
+
+.analytics-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+.analytics-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.analytics-tab {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.analytics-tab:hover {
+  border-color: var(--text-faint);
+  color: var(--text);
+}
+
+.analytics-tab.active {
+  background: var(--text);
+  border-color: var(--text);
+  color: #0b0b0c;
+  font-weight: 600;
 }
 
 .analytics-chart-label {
