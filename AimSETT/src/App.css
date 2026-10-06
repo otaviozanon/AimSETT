@@ -1,0 +1,779 @@
+:root {
+  --bg: #0b0b0c;
+  --surface: #131315;
+  --surface-2: #19191c;
+  --border: #26262a;
+  --text: #e8e8ea;
+  --text-muted: #8c8c93;
+  --text-faint: #58585e;
+  --accent: #ff5a3c;
+  --accent-soft: rgba(255, 90, 60, 0.35);
+  --crosshair: #5eead4;
+  --dwell: #5eead4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  /* Prevents the browser from ever showing a text-selection (I-beam)
+     cursor over HUD labels/hints while a custom crosshair/cursor is
+     active during gameplay. */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* Lets the crosshair preview show on the menu too, before a run starts.
+     Interactive elements (buttons, inputs) set their own `cursor` and
+     override this. */
+  cursor: none;
+}
+
+/* "Cursor only" mode (crosshair disabled in settings): show the real OS
+   pointer on the menu screen instead of hiding it. */
+.stage.no-crosshair {
+  cursor: default;
+}
+
+/* While the custom crosshair is active, nothing in the main menu card
+   should reveal the OS pointer (buttons normally set their own
+   `cursor: pointer`, which would otherwise show through on hover) — only
+   the crosshair itself may be visible there. This does NOT apply to the
+   settings / crosshair modals: those are popups for fiddling with sliders
+   and a color picker, where the real OS pointer must always stay visible
+   and precise, no matter which crosshair mode is selected — otherwise you
+   can't tell where you're clicking/dragging. */
+.app:not(.cursor-only) .panel * {
+  cursor: none !important;
+}
+
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 14px clamp(14px, 4vw, 28px);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 5;
+}
+
+.brand {
+  font-family: "Rajdhani", "Inter", sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.title-accent {
+  color: var(--accent);
+}
+
+.hud {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 24px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-item {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.hud-item strong {
+  color: var(--text);
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+.hud-item.time {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.hud-item.combo strong {
+  color: var(--crosshair);
+}
+
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 24px;
+  text-align: center;
+  overflow-y: auto;
+}
+
+.back-btn {
+  display: block;
+  margin: 12px auto 0;
+}
+
+.title {
+  font-family: "Rajdhani", "Inter", sans-serif;
+  font-size: clamp(2.2rem, 8vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0;
+  color: var(--text);
+}
+
+.results {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px clamp(16px, 6vw, 44px);
+  width: min(560px, 92vw);
+  box-sizing: border-box;
+}
+
+.results h2 {
+  margin: 0 0 4px;
+  color: var(--text);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.results-meta {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.results-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px 30px;
+}
+
+.results-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.results-grid span {
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.results-grid strong {
+  font-size: 1.35rem;
+  font-weight: 600;
+}
+
+.results-logo {
+  margin: 20px 0 0;
+  opacity: 0.7;
+  font-size: 1.8rem;
+}
+
+.options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+}
+
+.option-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 420px;
+}
+
+.option-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.option-label {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pill {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.88rem;
+  transition: all 0.15s ease;
+  min-height: 38px;
+}
+
+.pill:hover {
+  border-color: var(--text-faint);
+  color: var(--text);
+}
+
+.pill.active {
+  background: var(--text);
+  border-color: var(--text);
+  color: #0b0b0c;
+  font-weight: 600;
+}
+
+.start-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon-toggle-row {
+  display: flex;
+  gap: 10px;
+}
+
+.crosshair-icon-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.crosshair-icon-btn:hover {
+  border-color: var(--text-faint);
+  color: var(--text);
+}
+
+.crosshair-icon-glyph {
+  font-size: 1rem;
+}
+
+.start-btn {
+  padding: 13px 40px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  background: var(--accent);
+  color: #0b0b0c;
+  cursor: pointer;
+  transition:
+    filter 0.15s ease,
+    transform 0.1s ease;
+}
+
+.start-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.link-btn:hover {
+  color: var(--text);
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lang-switch {
+  display: flex;
+  gap: 4px;
+}
+
+.lang-btn {
+  min-width: 30px;
+  height: 36px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lang-btn:hover {
+  border-color: var(--text-faint);
+  color: var(--text);
+}
+
+.lang-btn.active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(255, 90, 60, 0.12);
+}
+
+/* Both the settings and crosshair panels open as centered modals. */
+.crosshair-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  cursor: default;
+  /* Fallback for very short/narrow viewports: if the panel's own max-height
+     or width still doesn't fit, let the backdrop scroll instead of clipping
+     it off-screen with no way to reach the rest. */
+  overflow: auto;
+  padding: 24px 16px;
+}
+
+.settings-panel,
+.settings-panel * {
+  /* Always the real OS pointer inside settings/crosshair modals, regardless
+     of the crosshair mode selected for the game — sliders, the color
+     picker and buttons here need a precise, visible cursor. */
+  cursor: default !important;
+}
+
+.settings-panel input[type="range"],
+.settings-panel input[type="color"],
+.settings-panel button {
+  cursor: pointer !important;
+}
+
+.settings-panel {
+  position: static;
+  z-index: 10;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(280px, 90vw);
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+}
+
+/* Crosshair config: minimalist square-ish shape with room for all fields
+   plus the live preview box, no forced aspect-ratio (that's what was
+   squeezing it down and triggering the scrollbar). The preview box is kept
+   compact so toggling optional fields (e.g. the center dot slider) doesn't
+   push the panel's total height over the scroll threshold. */
+.settings-panel.crosshair-panel {
+  width: min(300px, 90vw);
+}
+
+.crosshair-preview-box {
+  position: relative;
+  width: 100%;
+  height: 100px;
+  flex-shrink: 0;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+
+.crosshair-preview-cursor-hint {
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.settings-panel h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.settings-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.settings-panel input[type="range"] {
+  accent-color: var(--accent);
+}
+
+.settings-panel span {
+  align-self: flex-end;
+  color: var(--text);
+  font-size: 0.76rem;
+}
+
+.info-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-style: italic;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.info-btn:hover {
+  border-color: var(--text-faint);
+  color: var(--text);
+}
+
+.mode-info-text {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 4px 0 0;
+  text-align: center;
+}
+
+.arena {
+  position: relative;
+  flex: 1;
+  background: var(--bg);
+  overflow: hidden;
+  cursor: none;
+}
+
+/* "Cursor only" mode (custom crosshair disabled in settings): show the
+   real OS pointer instead of hiding it. */
+.arena.no-crosshair {
+  cursor: default;
+}
+
+/* Targets force `cursor: none` so the custom crosshair is never occluded
+   by the OS pointer; in "cursor only" mode (crosshair disabled) that same
+   rule would still hide the real pointer over targets, so it must yield
+   back to the default OS cursor there. */
+.arena.no-crosshair .target {
+  cursor: default;
+}
+
+.crosshair {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  opacity: 0.9;
+  z-index: 4;
+}
+
+.ch-line {
+  position: absolute;
+}
+
+.ch-top,
+.ch-bottom {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.ch-left,
+.ch-right {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.ch-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.center-gate {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.center-gate-ring {
+  width: 64px;
+  height: 64px;
+  transform: rotate(-90deg);
+}
+
+.center-gate-ring .track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 3;
+}
+
+.center-gate-ring .progress {
+  fill: none;
+  stroke: var(--dwell);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 175.93; /* 2 * PI * 28 */
+  transition: stroke-dashoffset 0.05s linear;
+}
+
+.center-gate-hint {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.exit-btn {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  z-index: 6;
+}
+
+.exit-btn:hover {
+  border-color: var(--text-faint);
+  color: var(--text);
+}
+
+.dwell-ring {
+  position: absolute;
+  inset: 0;
+  transform: rotate(0deg);
+}
+
+.mode-tag {
+  position: absolute;
+  bottom: 14px;
+  right: 18px;
+  color: var(--text-faint);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.target {
+  position: absolute;
+  border: none;
+  background: transparent;
+  cursor: none;
+  padding: 0;
+  /* overridden below for "cursor only" mode */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pop 0.12s ease-out;
+}
+
+.target-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 90, 60, 0.4);
+}
+
+.target-core {
+  width: 46%;
+  height: 46%;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.target:hover .target-core {
+  filter: brightness(1.12);
+}
+
+.analytics {
+  width: 100%;
+  max-width: 560px;
+  margin: 10px auto 0;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+
+.analytics-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 8px;
+  text-align: center;
+}
+
+.analytics-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px 28px;
+  margin-bottom: 10px;
+}
+
+.analytics-metrics > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.analytics-metrics span {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.analytics-metrics strong {
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.analytics-chart {
+  margin-bottom: 8px;
+  min-width: 0;
+}
+
+.analytics-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+.analytics-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.analytics-tab {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.analytics-tab:hover {
+  border-color: var(--text-faint);
+  color: var(--text);
+}
+
+.analytics-tab.active {
+  background: var(--text);
+  border-color: var(--text);
+  color: #0b0b0c;
+  font-weight: 600;
+}
+
+.analytics-chart-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 0 0 4px;
+  text-align: center;
+}
+
+.play-area-bounds {
+  position: absolute;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
